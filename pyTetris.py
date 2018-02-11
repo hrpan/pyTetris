@@ -1,3 +1,4 @@
+from numba import jit
 import numpy as np
 
 block_I = np.array([
@@ -5,42 +6,42 @@ block_I = np.array([
     [1,1,1,1],
     [0,0,0,0],
     [0,0,0,0]
-])
+],dtype=np.int8)
 
 block_O = np.array([
     [1,1],
     [1,1]
-])
+],dtype=np.int8)
 
 block_T = np.array([
     [0,1,0],
     [1,1,1],
     [0,0,0]
-])
+],dtype=np.int8)
 
 block_S = np.array([
     [0,1,1],
     [1,1,0],
     [0,0,0]
-])
+],dtype=np.int8)
 
 block_Z = np.array([
     [1,1,0],
     [0,1,1],
     [0,0,0]
-])
+],dtype=np.int8)
 
 block_J = np.array([
     [0,0,1],
     [1,1,1],
     [0,0,0]
-])
+],dtype=np.int8)
 
 block_L = np.array([
     [1,0,0],
     [1,1,1],
     [0,0,0]
-])
+],dtype=np.int8)
 
 blocks = [
     [np.rot90(block_I,k) for k in range(4)],
@@ -50,6 +51,10 @@ blocks = [
     [np.rot90(block_Z,k) for k in range(4)],
     [np.rot90(block_J,k) for k in range(4)],
     [np.rot90(block_L,k) for k in range(4)],
+]
+
+filled = [
+    [np.where( b ==1 ) for b in btypes] for btypes in blocks        
 ]
 
 class Block:
@@ -76,9 +81,16 @@ class Block:
         self.position = p
 
     def getFilled(self):
+        """
         b = blocks[self.block_type][self.rot_idx]
         ones = np.where( b == 1 )
-        idx = [ones[i] + self.position[i] for i in range(2)]
+        """
+        _p = self.position
+
+        _tmp = filled[self.block_type][self.rot_idx]
+
+        idx = (_tmp[0] + _p[0], _tmp[1] + _p[1])
+        #idx = [ones[i] + self.position[i] for i in range(2)]
         return idx
     
     def clone(self):
@@ -88,11 +100,36 @@ class Block:
             setattr(_tmp,k,v)
         return _tmp
 
+    def equiv(self,b):
+        if (self.position == b.position and 
+            self.block_type == b.block_type and 
+            self.rot_idx == b.rot_idx):
+            return True
+        return False
+
+@jit(nopython=True)
+def inside(indices,boardsize):
+    h, w = boardsize
+    l = len(indices[0])
+    for i in range(l):
+        x, y = indices[0][i], indices[1][i]
+        if x < 0 or x >= h or y < 0 or y >= w :
+            return False
+    return True
+
+@jit(nopython=True)
+def checkFilled(indices,board):
+    l = len(indices[0])
+    for i in range(l):
+        if board[indices[0][i]][indices[1][i]] == 1:
+            return True
+    return False
+
 class Board:
 
     def __init__(self,boardsize=(22,10)):
         self.boardsize = boardsize
-        self.board = np.zeros(boardsize)
+        self.board = np.zeros(boardsize,dtype=np.int8)
 
     def reset(self):
         self.board.fill(0)
@@ -103,17 +140,21 @@ class Board:
         for c in range(n_rows-1):
             if np.sum(self.board[-1-c]) == n_cols:
                 count += 1
-                self.board[1:22-c] = self.board[0:21-c]
+                self.board[1:n_rows-c] = self.board[0:n_rows-c-1]
                 self.board[0] = 0
         return count
+
     def checkFilled(self,indices):
+        """
         if 1 in self.board[indices]:
             return True
         return False
+        """
+        return checkFilled(indices,self.board)
 
     def fillBoard(self,indices):
         self.board[indices] = 1
-
+    """
     def inside(self,indices):
         for i in indices[0]:
             if i < 0 or i >= self.boardsize[0]:
@@ -122,12 +163,14 @@ class Board:
             if i < 0 or i >= self.boardsize[1]:
                 return False
         return True
+    """
 
     def checkLegal(self,indices):
         """
         Check if given indices can be filled, return True if legal, False otherwise
         """
-        if not self.inside(indices):
+        #if not self.inside(indices):
+        if not inside(indices,self.boardsize):
             return False
 
         if self.checkFilled(indices):
@@ -140,6 +183,14 @@ class Board:
         _tmp.boardsize = self.boardsize
         _tmp.board = np.copy(self.board)
         return _tmp
+    
+    def equiv(self,b):
+        """
+        Determine if two Boards are equiv, return True if yes, False otherwise
+        """
+        if np.array_equal(self.board,b.board):
+            return True
+        return False
 
 class Tetris:
 
@@ -277,14 +328,28 @@ class Tetris:
         return success
 
     def getState(self):
-
+        """
+        Return state (board + block)
+        """
         f_idx = self.block.getFilled()
         b = np.copy(self.board.board)
         b[f_idx] = -1
 
         return b
 
+    def printState(self):
+        print(self.getState())
+
+    def getScore(self):
+        """
+        Return score
+        """
+        return self.score
+
     def clone(self):
+        """
+        Make a clone of self
+        """
         _tmp = Tetris.__new__(Tetris)
         for k, v in self.__dict__.items():
             if k is 'board':
@@ -294,4 +359,11 @@ class Tetris:
             else:
                 setattr(_tmp,k,v)
         return _tmp
-
+    
+    def equiv(self,env):
+        if (self.block.equiv(env.block) and 
+            self.board.equiv(env.board) and 
+            np.array_equal(self.b_seq,env.b_seq) and 
+            self.b_seq_idx == env.b_seq_idx):
+            return True
+        return False
