@@ -214,7 +214,7 @@ class Board:
 
     def getState(self):
 
-        return (*self.board.ravel(),)
+        return self.board.tostring()
 
 class Tetris:
 
@@ -388,9 +388,9 @@ class Tetris:
     
     def __hash__(self):
 
-        _tuple = (*self.board.getState(),
+        _tuple = (self.board.getState(),
                 *self.block.getState(),
-                *self.b_seq.ravel(),
+                self.b_seq.tostring(),
                 self.b_seq_idx,
                 self.score)
 
