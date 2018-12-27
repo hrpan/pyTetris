@@ -253,6 +253,9 @@ t_spec = [
     ('boardsize', int8[:]),
     ('b_seq', int32[:]),
     ('b_seq_idx', int32),
+    ('b2b_tetris', boolean),
+    ('combo', int32),
+    ('lines', int32),
     ('init_pos', int32[:]),
     ('score', int32),
     ('end', boolean),
@@ -285,6 +288,10 @@ class T:
 
         self.action_count = 0
 
+        self.b2b_tetris = False        
+
+        self.combo = 0
+        self.lines = 0
         self.score = 0
 
         self.spawnBlock()
@@ -327,8 +334,25 @@ class T:
         self.board.fillBoard(f_idx)
         
         cl = self.board.clearLines()
-        
-        self.score += cl
+
+        if cl == 0:
+            self.combo = 0
+            self.b2b_tetris = False
+        else:
+            self.score += 50 * self.combo
+            self.combo += 1
+            if cl < 4:
+                self.b2b_tetris = False
+                self.score += 200 * cl - 100
+            elif cl == 4:
+                if self.b2b_tetris:
+                    self.score += 1200
+                else:
+                    self.b2b_tetris = True
+                self.score += 800
+            
+
+        self.lines += cl
 
         self.end = not self.spawnBlock()
 
@@ -373,7 +397,8 @@ class T:
         2 : Move left
         3 : Move down
         4 : Move right
-        5 : pass
+        5 : Hard drop
+        6 : pass
         return True if success, False otherwise
         """
         if action == 0:
@@ -386,8 +411,14 @@ class T:
             success = self.move((1,0))
             if not success:
                 self.detachBlock()
+            else:
+                self.score += 1
         elif action == 4:
             success = self.move((0,1))
+        elif action == 5:
+            while self.move((1, 0)):
+                self.score += 2
+            self.detachBlock()
         else:
             success = False
        
@@ -441,6 +472,8 @@ class T:
 
         _h = 31 * _h + self.b_seq_idx
         _h = 31 * _h + self.score
+        _h = 31 * _h + self.lines
+        _h = 31 * _h + self.combo
 
         return _h
 
@@ -454,6 +487,9 @@ def fillT(t1, t2):
     t1.boardsize[:] = t2.boardsize
     t1.b_seq[:] = t2.b_seq[:]
     t1.b_seq_idx = t2.b_seq_idx
+    t1.b2b_tetris = t2.b2b_tetris
+    t1.combo = t2.combo
+    t1.lines = t2.lines
     t1.init_pos[:] = t2.init_pos
     t1.end = t2.end
     t1.score = t2.score
@@ -464,6 +500,10 @@ def equalT(t1, t2):
         equalBlock(t1.block, t2.block) and
         equalBoard(t1.board, t2.board) and
         array_equal(t1.b_seq, t2.b_seq) and
+        t1.b_seq_idx == t2.b_seq_idx and
+        t1.b2b_tetris == t2.b2b_tetris and
+        t1.combo == t2.combo and
+        t1.lines == t2.lines and
         t1.score == t2.score)
 
 class Tetris:
@@ -488,7 +528,8 @@ class Tetris:
         2 : Move left
         3 : Move down
         4 : Move right
-        5 : pass
+        5 : Hard drop
+        6 : pass
         """
         self.tetris.play(action)
 
