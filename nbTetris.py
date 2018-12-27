@@ -542,6 +542,18 @@ class Tetris:
     def printState(self):
         print(self.getState())
 
+    def getCombo(self):
+        """
+        Return current combo count
+        """
+        return self.tetris.combo
+
+    def getLines(self):
+        """
+        Return lines cleared
+        """
+        return self.tetris.lines
+
     def getScore(self):
         """
         Return score
