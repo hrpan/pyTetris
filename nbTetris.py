@@ -337,7 +337,6 @@ class T:
 
         if cl == 0:
             self.combo = 0
-            self.b2b_tetris = False
         else:
             self.score += 50 * self.combo
             self.combo += 1
