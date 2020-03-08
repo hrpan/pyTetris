@@ -363,8 +363,8 @@ class T:
                     self.b2b_tetris = True
                 self.score += 800
 
-        self.lines += cl
-        self.line_stats[cl-1] += 1
+            self.lines += cl
+            self.line_stats[cl-1] += 1
 
         self.end = not self.spawnBlock()
 
@@ -470,16 +470,15 @@ class T:
         _h = 0
 
         _board = self.board.getState()
-        for i in range(self.boardsize[0] * self.boardsize[1]):
-            _h = 31 * _h + _board.flat[i]
+        for b in _board.flat:
+            _h = 31 * _h + b
 
         _block = self.block.getState()
+        for b in _block:
+            _h = 31 * _h + b
 
-        for i in range(len(_block)):
-            _h = 31 * _h + _block[i]
-
-        for i in range(len(self.b_seq)):
-            _h = 31 * _h + self.b_seq[i]
+        for b in self.b_seq:
+            _h = 31 * _h + b
 
         _h = 31 * _h + self.b_seq_idx
         _h = 31 * _h + self.score
