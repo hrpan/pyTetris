@@ -533,6 +533,18 @@ class Tetris:
         return self.tetris.end
 
     @property
+    def line_clears(self):
+        return self.tetris.lines
+
+    @property
+    def combo(self):
+        return self.tetris.combo
+
+    @property
+    def score(self):
+        return self.tetris.score
+
+    @property
     def line_stats(self):
         return self.tetris.line_stats
 
