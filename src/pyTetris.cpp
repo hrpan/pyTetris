@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <vector>
 #include <ctime>
+#include <iostream>
 #define P 919
 #define N 4
 
@@ -43,10 +44,8 @@ class Block{
 
     void getFilled(int filled[N][2]){
         for(int i=0;i<N;++i){
-            int row = blocks[block_type][rotation_index][i] / 4;
-            int col = blocks[block_type][rotation_index][i] % 4;
-            filled[i][0] = row + position[0];
-            filled[i][1] = col + position[1];
+            filled[i][0] = blocks[block_type][rotation_index][i][0] + position[0];
+            filled[i][1] = blocks[block_type][rotation_index][i][1] + position[1];
         }
     }
 
@@ -54,15 +53,15 @@ class Block{
         if(direction == 0)
             rotation_index = (rotation_index + 1) % 4;
         else
-            rotation_index = (rotation_index - 1) % 4;
+            rotation_index = (rotation_index + 3) % 4;
     }
 
     bool operator==(const Block &other){
         return (
-            position[0] != other.position[0] and
-            position[1] != other.position[1] and
-            block_type != other.block_type and 
-            rotation_index != other.rotation_index);
+            position[0] == other.position[0] and
+            position[1] == other.position[1] and
+            block_type == other.block_type and 
+            rotation_index == other.rotation_index);
     }
 
     int hash(){
@@ -348,6 +347,25 @@ class Tetris{
         }
     }
 
+    void printState(){
+
+        int filled[N][2];
+        block.getFilled(filled);
+
+        std::vector<short> b_tmp(board.board);
+
+        for(int i=0;i<N;++i)
+            b_tmp[filled[i][0] * boardsize[1] + filled[i][1]] = -1;
+         
+        for(int r=0;r<boardsize[0];++r){
+            for(int c=0;c<boardsize[1];++c)
+                std::cout << b_tmp[r * boardsize[1] + c] << " ";
+            std::cout << "\n";
+        }
+        std::cout << std::flush;
+
+    }
+
     py::array_t<short> getState(){
         int filled[N][2];
         block.getFilled(filled);
@@ -356,12 +374,33 @@ class Tetris{
 
         for(int i=0;i<N;++i)
             b_tmp[filled[i][0] * boardsize[1] + filled[i][1]] = -1;
-        
 
         int size = int(sizeof(short));
 
         return py::array_t<short>({boardsize[0], boardsize[1]}, {boardsize[1] * size, size}, &b_tmp[0]);
     }    
+
+    void copy_from(const Tetris &other){
+        action_count = other.action_count;
+        actions_per_drop = other.actions_per_drop;
+        boardsize[0] = other.boardsize[0];
+        boardsize[1] = other.boardsize[1];
+        init_pos[0] = other.init_pos[0];
+        init_pos[1] = other.init_pos[1];
+        end = other.end;
+        block = other.block;
+        board = other.board;
+        for(int i=0;i<7;++i)
+            b_seq[i] = other.b_seq[i];
+        b_seq_idx = other.b_seq_idx;
+        b2b_tetris = other.b2b_tetris;
+        combo = other.combo;
+        max_combo = other.max_combo;
+        line_clears = other.line_clears;
+        for(int i=0;i<N;++i)
+            line_stats[i] = other.line_stats[i];
+        score = other.score;
+    }
 
     bool operator==(const Tetris &other){
         return (
@@ -396,6 +435,7 @@ PYBIND11_MODULE(pyTetris, m){
         .def_readonly("score", &Tetris::score)
         .def_readonly("combo", &Tetris::combo)
         .def_readonly("max_combo", &Tetris::max_combo)
+        .def_readonly("end", &Tetris::end)
         .def("reset", &Tetris::reset)      
         .def("play", &Tetris::play) 
         .def(py::init<const std::vector<int> &, int>(),
