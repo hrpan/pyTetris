@@ -87,7 +87,7 @@ class BuildExt(build_ext):
 
 setup(
     name='pyTetris',
-    version='0.1',
+    version='0.1.1',
     author='',
     author_email='',
     url='https://github.com/hrpan/pyTetris',

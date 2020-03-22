@@ -6,6 +6,8 @@
 #include <vector>
 #include <ctime>
 #include <iostream>
+#include <cstdio>
+#include <numeric>
 #define P 919
 #define N 4
 
@@ -18,26 +20,23 @@ class Block{
     int rotation_index;
 
     Block(){
-        position[0] = 0;
-        position[1] = 0;
+        std::fill_n(position, 2, 0);
         block_type = 0;
         rotation_index = 0;
     }
 
-    Block(int init_pos[2], int init_type){ 
-        position[0] = init_pos[0]; 
-        position[1] = init_pos[1];
+    Block(int init_pos[2], int init_type){
+        std::copy_n(init_pos, 2, position);
         block_type = init_type;
     } 
 
     Block(const Block &other){
-        position[0] = other.position[0];
-        position[1] = other.position[1];
+        std::copy_n(other.position, 2, position);
         block_type = other.block_type;
         rotation_index = other.rotation_index;
     }
 
-    void move(int direction[2]){
+    void move(const int direction[2]){
         position[0] += direction[0];
         position[1] += direction[1];
     }
@@ -58,9 +57,8 @@ class Block{
 
     bool operator==(const Block &other){
         return (
-            position[0] == other.position[0] and
-            position[1] == other.position[1] and
-            block_type == other.block_type and 
+            std::equal(position, position+2, other.position) &&
+            block_type == other.block_type &&
             rotation_index == other.rotation_index);
     }
 
@@ -87,14 +85,12 @@ class Board{
     }
 
     Board(int init_bs[2]){
-        boardsize[0] = init_bs[0];
-        boardsize[1] = init_bs[1];
+        std::copy_n(init_bs, 2, boardsize);
         board.resize(boardsize[0] * boardsize[1]);
     }
 
     Board(const Board &other){
-        boardsize[0] = other.boardsize[0];
-        boardsize[1] = other.boardsize[1];
+        std::copy_n(other.boardsize, 2, boardsize);
         board = other.board;
     }
 
@@ -104,23 +100,21 @@ class Board{
 
     int clearLines(){
         int clears = 0;
+        auto begin = board.begin() + boardsize[1];
         for(int r=1;r<boardsize[0];++r){
-            bool isFilled = true;
 
-            int r_offset = r * boardsize[1];
-            for(int c=0;c<boardsize[1]&&isFilled;++c)
-                if(board[r_offset + c] != 1) isFilled = false;
+            auto end = begin + boardsize[1];
+            bool isFilled = std::find(begin, end, 0) == end;
+
             if(isFilled){
                 clears += 1;
-                for(int _r=1;_r<=r;++_r){
+                for(int _r=r;_r>0;--_r){
                     int _r_offset = _r * boardsize[1];
-                    int _rp_offset = (_r - 1) * boardsize[1];
-                    for(int _c=0;_c<boardsize[1];++_c)
-                        board[_r_offset + _c] = board[_rp_offset + _c];
+                    std::copy_n(board.begin() + _r_offset - boardsize[1], boardsize[1], board.begin() + _r_offset);
                 }
-                for(int _c=0;_c<boardsize[1];++_c)
-                    board[_c] = 0;
+                std::fill_n(board.begin(), boardsize[1], 0);
             }
+            begin += boardsize[1];
         }
         return clears;
     }
@@ -154,14 +148,8 @@ class Board{
     }
 
     bool operator==(const Board &other){
-        if(boardsize[0] != other.boardsize[0] || boardsize[1] != other.boardsize[1])
-            return false;
-
-        for(int i=0;i<boardsize[0] * boardsize[1];++i)
-            if(board[i] != other.board[i])
-                return false;
-            
-        return true;
+        return (std::equal(boardsize, boardsize+2, other.boardsize) &&
+                std::equal(board.begin(), board.end(), other.board.begin()));
     }
 
     int hash(){
@@ -190,16 +178,19 @@ class Tetris{
     int b_seq[7];
     int b_seq_idx;
 
+    constexpr static int down[2] = {1, 0};
+    constexpr static int left[2] = {0, -1};
+    constexpr static int right[2] = {0, 1};
+
     Tetris(std::vector<int> _bs, int _apd){
-        boardsize[0] = _bs[0];
-        boardsize[1] = _bs[1];
+        std::copy_n(_bs.begin(), 2, boardsize);
         board = Board(boardsize);
         init_pos[0] = 0;
         init_pos[1] = boardsize[1] / 2 - 2;
 
         actions_per_drop = _apd;
-        for(int i=0;i<7;++i)
-            b_seq[i] = i;
+
+        std::iota(b_seq, b_seq+7, 0);
 
         std::srand(std::time(0));
 
@@ -216,8 +207,7 @@ class Tetris{
         line_clears = 0;
         score = 0;
 
-        for(int i=0;i<4;++i)
-            line_stats[i] = 0;
+        std::fill_n(line_stats, 4, 0);
 
         spawnBlock();
 
@@ -276,11 +266,10 @@ class Tetris{
         end = !spawnBlock();
     }
 
-    bool move(int direction[2]){
+    bool move(const int direction[2]){
     
         int _tmp[2];
-        _tmp[0] = block.position[0];
-        _tmp[1] = block.position[1];
+        std::copy_n(block.position, 2, _tmp);
 
         block.move(direction);
 
@@ -288,8 +277,7 @@ class Tetris{
         block.getFilled(filled);
 
         if(!board.checkLegal(filled)){
-            block.position[0] = _tmp[0];
-            block.position[1] = _tmp[1];
+            std::copy_n(_tmp, 2, block.position);
             return false;
         }
 
@@ -319,21 +307,17 @@ class Tetris{
         }else if(action == 1){
             rotate(1);
         }else if(action == 2){
-            int _tmp[2] = {0, -1};
-            move(_tmp);
+            move(left);
         }else if(action == 3){
-            int _tmp[2] = {1, 0};
-            bool success = move(_tmp);
+            bool success = move(down);
             if(success)
                 score += 1;
             else
                 detachBlock();
         }else if(action == 4){
-            int _tmp[2] = {0, 1};
-            move(_tmp);
+            move(right);
         }else if(action == 5){
-            int _tmp[2] = {1, 0};
-            while(move(_tmp))
+            while(move(down))
                 score += 2;
             detachBlock();
         }
@@ -341,8 +325,7 @@ class Tetris{
         action_count = (action_count + 1) % actions_per_drop;
 
         if(action_count == 0){
-            int _tmp[2] = {1, 0};
-            if(!move(_tmp))
+            if(!move(down))
                 detachBlock();
         }
     }
@@ -360,10 +343,10 @@ class Tetris{
          
         for(int r=0;r<boardsize[0];++r){
             for(int c=0;c<boardsize[1];++c)
-                std::cout << b_tmp[r * boardsize[1] + c] << " ";
-            std::cout << "\n";
+                printf("%2d ", b_tmp[r * boardsize[1] + c]);
+            printf("\n");
         }
-        std::cout << std::flush;
+        fflush(stdout);
 
     }
 
@@ -386,22 +369,18 @@ class Tetris{
     void copy_from(const Tetris &other){
         action_count = other.action_count;
         actions_per_drop = other.actions_per_drop;
-        boardsize[0] = other.boardsize[0];
-        boardsize[1] = other.boardsize[1];
-        init_pos[0] = other.init_pos[0];
-        init_pos[1] = other.init_pos[1];
+        std::copy_n(other.boardsize, 2, boardsize);
+        std::copy_n(other.init_pos, 2, init_pos);
         end = other.end;
         block = other.block;
         board = other.board;
-        for(int i=0;i<7;++i)
-            b_seq[i] = other.b_seq[i];
+        std::copy_n(other.b_seq, 7, b_seq);
         b_seq_idx = other.b_seq_idx;
         b2b_tetris = other.b2b_tetris;
         combo = other.combo;
         max_combo = other.max_combo;
         line_clears = other.line_clears;
-        for(int i=0;i<N;++i)
-            line_stats[i] = other.line_stats[i];
+        std::copy_n(other.line_stats, N, line_stats);
         score = other.score;
     }
 
@@ -439,8 +418,10 @@ PYBIND11_MODULE(pyTetris, m){
         .def_readonly("combo", &Tetris::combo)
         .def_readonly("max_combo", &Tetris::max_combo)
         .def_readonly("end", &Tetris::end)
+        .def("copy_from", &Tetris::copy_from)
         .def("reset", &Tetris::reset)      
         .def("play", &Tetris::play) 
+        .def("printState", &Tetris::printState) 
         .def(py::init<const std::vector<int> &, int>(),
                 py::arg("boardsize") = py::make_tuple(22, 10), 
                 py::arg("actions_per_drop") = 1)
