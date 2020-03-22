@@ -87,12 +87,12 @@ class BuildExt(build_ext):
 
 setup(
     name='pyTetris',
-    version='0',
+    version='0.1',
     author='',
     author_email='',
-    url='',
-    description='',
-    long_description='',
+    url='https://github.com/hrpan/pyTetris',
+    description='Tetris environment for Python.',
+    long_description='A high performance Tetris environment for Python written in C++.',
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.4'],
     setup_requires=['pybind11>=2.4'],
