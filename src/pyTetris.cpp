@@ -349,13 +349,14 @@ class Tetris{
 
     void printState(){
 
-        int filled[N][2];
-        block.getFilled(filled);
-
         std::vector<short> b_tmp(board.board);
 
-        for(int i=0;i<N;++i)
-            b_tmp[filled[i][0] * boardsize[1] + filled[i][1]] = -1;
+        if(!end){
+            int filled[N][2];
+            block.getFilled(filled);
+            for(int i=0;i<N;++i)
+                b_tmp[filled[i][0] * boardsize[1] + filled[i][1]] = -1;
+        }
          
         for(int r=0;r<boardsize[0];++r){
             for(int c=0;c<boardsize[1];++c)
@@ -367,13 +368,15 @@ class Tetris{
     }
 
     py::array_t<short> getState(){
-        int filled[N][2];
-        block.getFilled(filled);
 
         std::vector<short> b_tmp(board.board);
 
-        for(int i=0;i<N;++i)
-            b_tmp[filled[i][0] * boardsize[1] + filled[i][1]] = -1;
+        if(!end){
+            int filled[N][2];
+            block.getFilled(filled);
+            for(int i=0;i<N;++i)
+                b_tmp[filled[i][0] * boardsize[1] + filled[i][1]] = -1;
+        }
 
         int size = int(sizeof(short));
 
