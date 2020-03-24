@@ -364,6 +364,10 @@ class Tetris{
 
     }
 
+    py::array get_line_stats(){
+        return py::array(line_stats.size(), line_stats.data()); 
+    }
+
     py::array_t<short> getState(){
 
         std::vector<short> b_tmp(board.board);
@@ -434,6 +438,7 @@ PYBIND11_MODULE(pyTetris, m){
         .def_readonly("combo", &Tetris::combo)
         .def_readonly("max_combo", &Tetris::max_combo)
         .def_readonly("end", &Tetris::end)
+        .def_property_readonly("line_stats", &Tetris::get_line_stats)
         .def("copy_from", &Tetris::copy_from)
         .def("reset", &Tetris::reset)      
         .def("play", &Tetris::play) 
