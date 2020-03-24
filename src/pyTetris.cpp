@@ -4,6 +4,7 @@
 #include <blocks.h>
 #include <algorithm>
 #include <vector>
+#include <array>
 #include <ctime>
 #include <iostream>
 #include <cstdio>
@@ -13,38 +14,77 @@
 
 namespace py = pybind11;
 
-class Block{
-    public:
-    int position[2];
-    int block_type;
-    int rotation_index;
+struct Vec{
+    int x, y;
 
-    Block(){
-        std::fill_n(position, 2, 0);
-        block_type = 0;
-        rotation_index = 0;
+    Vec() : x{0}, y{0}{}
+
+    Vec(int xx, int yy): x{xx}, y{yy} {}
+
+    Vec(const Vec &other){
+        x = other.x;
+        y = other.y;
     }
 
-    Block(int init_pos[2], int init_type){
-        std::copy_n(init_pos, 2, position);
+    void reset(){x=0; y=0;};
+
+    void operator=(const Vec &other){
+        x = other.x;
+        y = other.y;
+    }
+
+    bool operator==(const Vec &other){
+        return x == other.x && y == other.y;
+    }
+
+    void set(const int xx, const int yy){
+        x = xx;
+        y = yy;
+    }
+
+    void add(const Vec &other){
+        x += other.x;
+        y += other.y;
+    }
+};
+
+class Block{
+    public:
+    Vec position;
+    int block_type;
+    int rotation_index;
+    std::array<Vec, N> filled;
+
+    Block(){
+        position.reset();
+        block_type = 0;
+        rotation_index = 0;
+        set_filled();
+    }
+
+    Block(const Vec &init_pos, int init_type){
+        position = init_pos;
         block_type = init_type;
+        rotation_index = 0;
+        set_filled();
     } 
 
     Block(const Block &other){
-        std::copy_n(other.position, 2, position);
+        position = other.position;
         block_type = other.block_type;
         rotation_index = other.rotation_index;
+        set_filled();
     }
 
-    void move(const int direction[2]){
-        position[0] += direction[0];
-        position[1] += direction[1];
+    void move(const Vec &direction){
+        position.add(direction);
+        set_filled();
     }
 
-    void getFilled(int filled[N][2]){
+    void set_filled(){
         for(int i=0;i<N;++i){
-            filled[i][0] = blocks[block_type][rotation_index][i][0] + position[0];
-            filled[i][1] = blocks[block_type][rotation_index][i][1] + position[1];
+            filled[i].x = blocks[block_type][rotation_index][i][0] + position.x;
+            filled[i].y = blocks[block_type][rotation_index][i][1] + position.y;
         }
     }
 
@@ -53,19 +93,19 @@ class Block{
             rotation_index = (rotation_index + 1) % 4;
         else
             rotation_index = (rotation_index + 3) % 4;
+        set_filled();
     }
 
     bool operator==(const Block &other){
-        return (
-            std::equal(position, position+2, other.position) &&
-            block_type == other.block_type &&
-            rotation_index == other.rotation_index);
+        return position == other.position &&
+               block_type == other.block_type &&
+               rotation_index == other.rotation_index;
     }
 
     int hash(){
         int _h = 0;
-        _h = P * _h + position[0];
-        _h = P * _h + position[1];
+        _h = P * _h + position.x;
+        _h = P * _h + position.y;
         _h = P * _h + block_type;
         _h = P * _h + rotation_index;
 
@@ -74,23 +114,22 @@ class Block{
 };
 
 class Board{
-    public:
-    int boardsize[2];
+    public:;
+    Vec boardsize;
     std::vector<short> board;
 
     Board(){
-        boardsize[0] = 22;
-        boardsize[1] = 10;
-        board.resize(boardsize[0] * boardsize[1]);
+        boardsize.set(22, 10);
+        board.resize(220);
     }
 
-    Board(int init_bs[2]){
-        std::copy_n(init_bs, 2, boardsize);
-        board.resize(boardsize[0] * boardsize[1]);
+    Board(Vec init_bs){
+        boardsize = init_bs;
+        board.resize(boardsize.x * boardsize.y);
     }
 
     Board(const Board &other){
-        std::copy_n(other.boardsize, 2, boardsize);
+        boardsize = other.boardsize;
         board = other.board;
     }
 
@@ -100,56 +139,46 @@ class Board{
 
     int clearLines(){
         int clears = 0;
-        auto begin = board.begin() + boardsize[1];
-        for(int r=1;r<boardsize[0];++r){
+        for(auto begin=board.begin();begin<board.end();begin+=boardsize.y){
 
-            auto end = begin + boardsize[1];
+            auto end = begin + boardsize.y;
             bool isFilled = std::find(begin, end, 0) == end;
 
             if(isFilled){
                 clears += 1;
-                for(int _r=r;_r>0;--_r){
-                    int _r_offset = _r * boardsize[1];
-                    std::copy_n(board.begin() + _r_offset - boardsize[1], boardsize[1], board.begin() + _r_offset);
+                for(auto rbegin=begin;rbegin>board.begin();rbegin-=boardsize.y){
+                    std::copy_n(rbegin - boardsize.y, boardsize.y, rbegin);
                 }
-                std::fill_n(board.begin(), boardsize[1], 0);
+                std::fill_n(board.begin(), boardsize.y, 0);
             }
-            begin += boardsize[1];
         }
         return clears;
     }
 
-    bool checkFilled(int indices[N][2]){
-        for(int i=0;i<N;++i){
-            if(board[boardsize[1] * indices[i][0] + indices[i][1]] == 1)
+    template<typename T> bool checkFilled(const T &indices){
+        for(auto v: indices){
+            if(board[boardsize.y * v.x + v.y] == 1)
                 return true;
         }
         return false;
     }
 
-    void fillBoard(int indices[N][2]){
-        for(int i=0;i<N;++i)
-            board[boardsize[1] * indices[i][0] + indices[i][1]] = 1;
+    template<typename T> void fillBoard(const T &indices){
+        for(auto v: indices){
+            board[boardsize.y * v.x + v.y] = 1;
+        }
     }
 
-    bool checkLegal(int indices[N][2]){
-        for(int i=0;i<N;++i){
-            if( indices[i][0] < 0 ||
-                indices[i][0] >= boardsize[0] ||
-                indices[i][1] < 0 ||
-                indices[i][1] >= boardsize[1])
+    template<typename T> bool checkLegal(const T &indices){
+        for(auto v: indices){
+            if(v.x < 0 || v.x >= boardsize.x || v.y < 0 || v.y >= boardsize.y)
                 return false;
         }
-
-        if(checkFilled(indices))
-            return false;
-
-        return true;
+        return !checkFilled(indices);
     }
 
     bool operator==(const Board &other){
-        return (std::equal(boardsize, boardsize+2, other.boardsize) &&
-                std::equal(board.begin(), board.end(), other.board.begin()));
+        return boardsize == other.boardsize && board == other.board;
     }
 
     int hash(){
@@ -166,31 +195,31 @@ class Tetris{
     int actions_per_drop;
     Block block;
     Board board;
-    int boardsize[2];
-    int init_pos[2];
+    Vec boardsize;
+    Vec init_pos;
     bool b2b_tetris;
     int combo;
     int max_combo;
     int line_clears;
     int score;
     bool end;
-    int line_stats[4];
-    int b_seq[7];
+    std::array<int, N> line_stats;
+    std::array<int, 7> b_seq;
     int b_seq_idx;
 
-    constexpr static int down[2] = {1, 0};
-    constexpr static int left[2] = {0, -1};
-    constexpr static int right[2] = {0, 1};
+    static Vec down, left, right;
+    //static Vec down = Vec(1, 0);
+    //static Vec left = Vec(0, -1);
+    //static Vec right = Vec(0, 1});
 
     Tetris(std::vector<int> _bs, int _apd){
-        std::copy_n(_bs.begin(), 2, boardsize);
+        boardsize.set(_bs[0], _bs[1]);
         board = Board(boardsize);
-        init_pos[0] = 0;
-        init_pos[1] = boardsize[1] / 2 - 2;
+        init_pos.set(0, boardsize.y / 2 - 2);
 
         actions_per_drop = _apd;
 
-        std::iota(b_seq, b_seq+7, 0);
+        std::iota(b_seq.begin(), b_seq.end(), 0);
 
         std::srand(std::time(0));
 
@@ -207,7 +236,7 @@ class Tetris{
         line_clears = 0;
         score = 0;
 
-        std::fill_n(line_stats, 4, 0);
+        std::fill(line_stats.begin(), line_stats.end(), 0);
 
         spawnBlock();
 
@@ -215,7 +244,7 @@ class Tetris{
     }
 
     void shuffle_block_sequence(){
-        std::random_shuffle(b_seq, b_seq+7);
+        std::random_shuffle(b_seq.begin(), b_seq.end());
         b_seq_idx = 0;
     }
 
@@ -226,20 +255,12 @@ class Tetris{
         if(b_seq_idx == 7)
             shuffle_block_sequence();
 
-        int filled[N][2];
-        block.getFilled(filled);
-
-        if(board.checkFilled(filled))
-            return false;
-
-        return true;
+        return !board.checkFilled(block.filled);
     }
 
     void detachBlock(){
-        int filled[N][2];
-        block.getFilled(filled);
 
-        board.fillBoard(filled);
+        board.fillBoard(block.filled);
 
         int cl = board.clearLines();
 
@@ -266,18 +287,15 @@ class Tetris{
         end = !spawnBlock();
     }
 
-    bool move(const int direction[2]){
+    bool move(const Vec &direction){
     
-        int _tmp[2];
-        std::copy_n(block.position, 2, _tmp);
+        Vec _tmp(block.position);
 
         block.move(direction);
 
-        int filled[N][2];
-        block.getFilled(filled);
-
-        if(!board.checkLegal(filled)){
-            std::copy_n(_tmp, 2, block.position);
+        if(!board.checkLegal(block.filled)){
+            block.position = _tmp;
+            block.set_filled();
             return false;
         }
 
@@ -289,11 +307,9 @@ class Tetris{
         int _tmp = block.rotation_index;
         block.rotate(direction);
         
-        int filled[N][2];
-        block.getFilled(filled);
-
-        if(!board.checkLegal(filled)){
+        if(!board.checkLegal(block.filled)){
             block.rotation_index = _tmp;
+            block.set_filled();
             return false;
         }
 
@@ -335,15 +351,13 @@ class Tetris{
         std::vector<short> b_tmp(board.board);
 
         if(!end){
-            int filled[N][2];
-            block.getFilled(filled);
-            for(int i=0;i<N;++i)
-                b_tmp[filled[i][0] * boardsize[1] + filled[i][1]] = -1;
+            for(auto v: block.filled)
+                b_tmp[v.x * boardsize.y + v.y] = -1;
         }
          
-        for(int r=0;r<boardsize[0];++r){
-            for(int c=0;c<boardsize[1];++c)
-                printf("%2d ", b_tmp[r * boardsize[1] + c]);
+        for(int r=0;r<boardsize.x;++r){
+            for(int c=0;c<boardsize.y;++c)
+                printf("%2d ", b_tmp[r * boardsize.y + c]);
             printf("\n");
         }
         fflush(stdout);
@@ -355,32 +369,30 @@ class Tetris{
         std::vector<short> b_tmp(board.board);
 
         if(!end){
-            int filled[N][2];
-            block.getFilled(filled);
-            for(int i=0;i<N;++i)
-                b_tmp[filled[i][0] * boardsize[1] + filled[i][1]] = -1;
+            for(auto v: block.filled)
+                b_tmp[v.x * boardsize.y + v.y] = -1;
         }
 
         int size = int(sizeof(short));
 
-        return py::array_t<short>({boardsize[0], boardsize[1]}, {boardsize[1] * size, size}, &b_tmp[0]);
+        return py::array_t<short>({boardsize.x, boardsize.y}, {boardsize.y * size, size}, &b_tmp[0]);
     }    
 
     void copy_from(const Tetris &other){
         action_count = other.action_count;
         actions_per_drop = other.actions_per_drop;
-        std::copy_n(other.boardsize, 2, boardsize);
-        std::copy_n(other.init_pos, 2, init_pos);
+        boardsize = other.boardsize;
+        init_pos = other.init_pos;
         end = other.end;
         block = other.block;
         board = other.board;
-        std::copy_n(other.b_seq, 7, b_seq);
+        b_seq = other.b_seq;
         b_seq_idx = other.b_seq_idx;
         b2b_tetris = other.b2b_tetris;
         combo = other.combo;
         max_combo = other.max_combo;
         line_clears = other.line_clears;
-        std::copy_n(other.line_stats, N, line_stats);
+        line_stats = other.line_stats;
         score = other.score;
     }
 
@@ -389,13 +401,13 @@ class Tetris{
             action_count == other.action_count and
             block == other.block and
             board == other.board and
-            std::equal(b_seq, b_seq + 7, other.b_seq) and
+            b_seq == other.b_seq and
             b_seq_idx == other.b_seq_idx and
             b2b_tetris == other.b2b_tetris and
             combo == other.combo and
             max_combo == other.max_combo and
             line_clears == other.line_clears and
-            std::equal(line_stats, line_stats + 4, other.line_stats) and
+            line_stats == other.line_stats and
             score == other.score);
     }
 
@@ -410,6 +422,10 @@ class Tetris{
         return _h; 
     }
 };
+
+Vec Tetris::down = Vec(1, 0);
+Vec Tetris::left = Vec(0, -1);
+Vec Tetris::right = Vec(0, 1);
 
 PYBIND11_MODULE(pyTetris, m){
     py::class_<Tetris>(m, "Tetris")
