@@ -9,6 +9,8 @@
 #include <iostream>
 #include <cstdio>
 #include <numeric>
+#include <random>
+#include <cstdlib>
 #define P 919
 #define N 4
 
@@ -88,7 +90,7 @@ class Block{
         }
     }
 
-    void rotate(int direction){
+    void rotate(const int direction){
         if(direction == 0)
             rotation_index = (rotation_index + 1) % 4;
         else
@@ -113,19 +115,23 @@ class Block{
     }
 };
 
+using Pixel=char;
+
 class Board{
     public:;
     Vec boardsize;
-    std::vector<short> board;
+    std::vector<Pixel> board;
 
     Board(){
         boardsize.set(22, 10);
         board.resize(220);
+        reset();
     }
 
     Board(Vec init_bs){
         boardsize = init_bs;
         board.resize(boardsize.x * boardsize.y);
+        reset();
     }
 
     Board(const Board &other){
@@ -142,9 +148,8 @@ class Board{
         for(auto begin=board.begin();begin<board.end();begin+=boardsize.y){
 
             auto end = begin + boardsize.y;
-            bool isFilled = std::find(begin, end, 0) == end;
 
-            if(isFilled){
+            if(std::find(begin, end, 0) == end){
                 clears += 1;
                 for(auto rbegin=begin;rbegin>board.begin();rbegin-=boardsize.y){
                     std::copy_n(rbegin - boardsize.y, boardsize.y, rbegin);
@@ -212,7 +217,7 @@ class Tetris{
     //static Vec left = Vec(0, -1);
     //static Vec right = Vec(0, 1});
 
-    Tetris(std::vector<int> _bs, int _apd){
+    Tetris(const std::vector<int> _bs, int _apd){
         boardsize.set(_bs[0], _bs[1]);
         board = Board(boardsize);
         init_pos.set(0, boardsize.y / 2 - 2);
@@ -348,7 +353,7 @@ class Tetris{
 
     void printState(){
 
-        std::vector<short> b_tmp(board.board);
+        std::vector<Pixel> b_tmp(board.board);
 
         if(!end){
             for(auto v: block.filled)
@@ -368,18 +373,18 @@ class Tetris{
         return py::array(line_stats.size(), line_stats.data()); 
     }
 
-    py::array_t<short> getState(){
+    py::array_t<Pixel> getState(){
 
-        std::vector<short> b_tmp(board.board);
+        std::vector<Pixel> b_tmp(board.board);
 
         if(!end){
             for(auto v: block.filled)
                 b_tmp[v.x * boardsize.y + v.y] = -1;
         }
 
-        int size = int(sizeof(short));
+        size_t size = size_t(sizeof(Pixel));
 
-        return py::array_t<short>({boardsize.x, boardsize.y}, {boardsize.y * size, size}, &b_tmp[0]);
+        return py::array_t<Pixel>({boardsize.x, boardsize.y}, {boardsize.y * size, size}, &b_tmp[0]);
     }    
 
     void copy_from(const Tetris &other){
