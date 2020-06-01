@@ -343,8 +343,9 @@ class Tetris{
         }else if(action == 2){
             move(left);
         }else if(action == 3){
-            if(move(down) && scoring == guideline)
-                score += 1;
+            if(move(down))
+                if(scoring == guideline)
+                    score += 1;
             else
                 detachBlock();
         }else if(action == 4){
