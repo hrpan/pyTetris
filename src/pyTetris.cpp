@@ -253,7 +253,10 @@ class Tetris{
     }
 
     void shuffle_block_sequence(){
-        std::random_shuffle(b_seq.begin(), b_seq.end());
+        if(randomizer == bag)
+            std::random_shuffle(b_seq.begin(), b_seq.end());
+        else if(randomizer == uniform)
+            b_seq[0] = std::rand() % 7;
         b_seq_idx = 0;
     }
 
@@ -266,7 +269,7 @@ class Tetris{
             if(b_seq_idx == 7)
                 shuffle_block_sequence();
         }else if(randomizer == uniform){
-            b_seq[0] = std::rand() % 7;     
+            shuffle_block_sequence();
         }
 
         return !board.checkFilled(block.filled);
@@ -343,17 +346,19 @@ class Tetris{
         }else if(action == 2){
             move(left);
         }else if(action == 3){
-            if(move(down))
+            if(move(down)){
                 if(scoring == guideline)
                     score += 1;
-            else
+            }else{
                 detachBlock();
+            }
         }else if(action == 4){
             move(right);
         }else if(action == 5){
-            while(move(down))
+            while(move(down)){
                 if(scoring == guideline)
                     score += 2;
+            }
             detachBlock();
         }
 
