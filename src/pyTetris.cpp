@@ -194,6 +194,9 @@ class Board{
     }
 };
 
+enum Scoring{ guideline, lines };
+enum Randomizer{ bag, uniform };
+
 class Tetris{
     public:
     int action_count;
@@ -207,17 +210,16 @@ class Tetris{
     int max_combo;
     int line_clears;
     int score;
+    Scoring scoring;
     bool end;
     std::array<int, N> line_stats;
     std::array<int, 7> b_seq;
     int b_seq_idx;
+    Randomizer randomizer;
 
     static Vec down, left, right;
-    //static Vec down = Vec(1, 0);
-    //static Vec left = Vec(0, -1);
-    //static Vec right = Vec(0, 1});
 
-    Tetris(const std::vector<int> _bs, int _apd){
+    Tetris(const std::vector<int> _bs, int _apd, int _scoring, int _randomizer){
         boardsize.set(_bs[0], _bs[1]);
         board = Board(boardsize);
         init_pos.set(0, boardsize.y / 2 - 2);
@@ -227,7 +229,9 @@ class Tetris{
         std::iota(b_seq.begin(), b_seq.end(), 0);
 
         std::srand(std::time(0));
-
+        
+        scoring = (Scoring)_scoring;
+        randomizer = (Randomizer)_randomizer;
         reset();
     }
 
@@ -255,10 +259,15 @@ class Tetris{
 
     bool spawnBlock(){
         block = Block(init_pos, b_seq[b_seq_idx]);
-        b_seq_idx += 1;
 
-        if(b_seq_idx == 7)
-            shuffle_block_sequence();
+        if(randomizer == bag){
+            b_seq_idx += 1;
+
+            if(b_seq_idx == 7)
+                shuffle_block_sequence();
+        }else if(randomizer == uniform){
+            b_seq[0] = std::rand() % 7;     
+        }
 
         return !board.checkFilled(block.filled);
     }
@@ -272,19 +281,23 @@ class Tetris{
         if(cl == 0){
             combo = 0;
         }else{
-            score += 50 * combo;
+            if(scoring == guideline){
+                score += 50 * combo;
+                if(cl < 4){
+                    b2b_tetris = false;
+                    score += 200 * cl - 100;
+                }else if(cl == 4){
+                    if(b2b_tetris)
+                        score += 1200;
+                    else
+                        b2b_tetris = true;
+                    score += 800;
+                }
+            }else{
+                score += cl;
+            }
             combo += 1;
             max_combo = combo > max_combo? combo:max_combo;
-            if(cl < 4){
-                b2b_tetris = false;
-                score += 200 * cl - 100;
-            }else if(cl == 4){
-                if(b2b_tetris)
-                    score += 1200;
-                else
-                    b2b_tetris = true;
-                score += 800;
-            }
             line_clears += cl;
             line_stats[cl-1] += 1;
         }
@@ -330,8 +343,7 @@ class Tetris{
         }else if(action == 2){
             move(left);
         }else if(action == 3){
-            bool success = move(down);
-            if(success)
+            if(move(down) && scoring == guideline)
                 score += 1;
             else
                 detachBlock();
@@ -339,7 +351,8 @@ class Tetris{
             move(right);
         }else if(action == 5){
             while(move(down))
-                score += 2;
+                if(scoring == guideline)
+                    score += 2;
             detachBlock();
         }
 
@@ -448,9 +461,11 @@ PYBIND11_MODULE(pyTetris, m){
         .def("reset", &Tetris::reset)      
         .def("play", &Tetris::play) 
         .def("printState", &Tetris::printState) 
-        .def(py::init<const std::vector<int> &, int>(),
+        .def(py::init<const std::vector<int> &, int, int, int>(),
                 py::arg("boardsize") = py::make_tuple(22, 10), 
-                py::arg("actions_per_drop") = 1)
+                py::arg("actions_per_drop") = 1,
+                py::arg("scoring") = 0,
+                py::arg("randomizer") = 0)
         .def("getState", &Tetris::getState)
         .def("__eq__", &Tetris::operator==)
         .def("__hash__", &Tetris::hash);
