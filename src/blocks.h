@@ -1,3 +1,5 @@
+#ifndef BLOCKS_H
+#define BLOCKS_H
 
 short blocks[7][4][4][2] = {
     //I
@@ -56,4 +58,4 @@ short blocks[7][4][4][2] = {
         { {1, 1}, {2, 1}, {3, 1}, {3, 0} },
     }
 };
-
+#endif
