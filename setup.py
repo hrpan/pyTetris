@@ -1,5 +1,7 @@
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
+from distutils.command.install_headers import install_headers
+import sysconfig
 import sys
 import setuptools
 
@@ -90,12 +92,16 @@ setup(
     version='0.3.1',
     author='',
     author_email='',
+    headers=[
+        'src/blocks.h',
+        'src/pyTetris.h',
+    ],
     url='https://github.com/hrpan/pyTetris',
     description='Tetris environment for Python.',
     long_description='A high performance Tetris environment for Python written in C++.',
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.4'],
     setup_requires=['pybind11>=2.4'],
-    cmdclass={'build_ext': BuildExt},
+    cmdclass={'build_ext': BuildExt, 'install_headers': install_headers},
     zip_safe=False,
 )
